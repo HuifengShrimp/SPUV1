@@ -191,7 +191,7 @@ ArrayRef MatMulAA::proc(KernelEvalContext* ctx, const ArrayRef& x,
     ring_add_(z, ring_mmul(x_a, y_b, M, N, K));
   }
 
-  // std::cout<<"----------arithmetic.cc : MatMulAA-----------"<<std::endl;
+  std::cout<<"----------arithmetic.cc : MatMulAA-----------"<<std::endl;
 
   return z.as(x.eltype());
 }
@@ -292,6 +292,8 @@ ArrayRef LogRegAA::proc(KernelEvalContext* ctx, const ArrayRef& x, const ArrayRe
   c3),
   tmp);
 
+  //truncation
+
 
   if (comm->getRank() == 1) {
     auto tmp1 = ring_mmul(ring_mmul(w_r2, x_r1T, 1, M, N), x_r1, K, N, M);
@@ -308,6 +310,8 @@ ArrayRef LogRegAA::proc(KernelEvalContext* ctx, const ArrayRef& x, const ArrayRe
   }
 
   std::cout<<"----------arithmetic.cc : LogRegAA-----------"<<std::endl;
+  auto bits = 18;
+  std::cout<<"----bits : "<<bits<<"-------"<<std::endl;
   
   return grad.as(x.eltype());
 }
@@ -318,7 +322,7 @@ ArrayRef LShiftA::proc(KernelEvalContext* ctx, const ArrayRef& in,
 
   const auto field = in.eltype().as<Ring2k>()->field();
   bits %= SizeOf(field) * 8;
-
+  std::cout<<"----------arithmetic.cc : LShiftA-----------"<<std::endl;
   return ring_lshift(in, bits).as(in.eltype());
 }
 
@@ -331,6 +335,8 @@ ArrayRef TruncPrA::proc(KernelEvalContext* ctx, const ArrayRef& x,
   if (comm->getWorldSize() == 2u) {
     // SecurlML, local trunction.
     // Ref: Theorem 1. https://eprint.iacr.org/2017/396.pdf
+    //lj-todo: truncation
+    std::cout<<"----------arithmetic.cc : TruncPrA-----------"<<std::endl;
     return ring_arshift(x, bits).as(x.eltype());
   } else {
     // ABY3, truncation pair method.

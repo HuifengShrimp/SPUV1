@@ -382,6 +382,7 @@ void ring_equal_(ArrayRef& x, const ArrayRef& y) { ring_equal_impl(x, x, y); }
 ArrayRef ring_arshift(const ArrayRef& x, size_t bits) {
   ArrayRef res(x.eltype(), x.numel());
   ring_arshift_impl(res, x, bits);
+  std::cout<<"------ring_ops : ring_arshift------"<<bits<<std::endl;
   return res;
 }
 

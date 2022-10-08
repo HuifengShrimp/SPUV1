@@ -113,6 +113,7 @@ void BindLink(py::module& m) {
           "all_gather",
           [&PY_CALL_TAG](const std::shared_ptr<Context>& self,
                          const std::string& in) -> std::vector<std::string> {
+            //truncation
             auto bufs = yasl::link::AllGather(self, in, PY_CALL_TAG);
             std::vector<std::string> ret(bufs.size());
             for (size_t idx = 0; idx < bufs.size(); ++idx) {

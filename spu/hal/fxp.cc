@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//lj-todo
+//truncation
+
+
 #include "spu/hal/fxp.h"
 
 #include <algorithm>
@@ -524,6 +528,19 @@ Value f_mmul(HalContext* ctx, const Value& x, const Value& y) {
   YASL_ENFORCE(y.isFxp());
 
   return _trunc(ctx, _mmul(ctx, x, y)).asFxp();
+}
+
+//lj
+Value f_logreg(HalContext* ctx, const Value& x, const Value& w, const Value& y) {
+  std::cout<<"---------fxp.cc----------"<<std::endl;
+  SPU_TRACE_HAL(ctx, x, w, y);
+  SPU_PROFILE_END_OP(ctx, x, w, y);
+
+  YASL_ENFORCE(x.isFxp());
+  YASL_ENFORCE(w.isFxp());
+  YASL_ENFORCE(y.isFxp());
+
+  return _trunc(ctx, _logreg(ctx, x, w, y)).asFxp();
 }
 
 Value f_div(HalContext* ctx, const Value& x, const Value& y) {

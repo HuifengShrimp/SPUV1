@@ -130,7 +130,8 @@ Value _logreg(HalContext* ctx, const Value& x, const Value& w, const Value& y) {
   if (x.isPublic() && w.isPublic() && y.isPublic()) {
     return _logreg_pp(ctx, x, w, y);
   } else{
-    return _logreg_ss(ctx, x, w, y);
+    std::cout<<"--------ring.cc : _logreg----------"<<std::endl;
+    return  _logreg_ss(ctx, x, w, y).asFxp();
   } 
 }
 

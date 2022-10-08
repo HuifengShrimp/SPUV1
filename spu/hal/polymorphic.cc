@@ -144,6 +144,7 @@ Value matmul(HalContext* ctx, const Value& x, const Value& y) {
 
 //lj
 Value logreg(HalContext* ctx, const Value& x, const Value& w, const Value& y) {
+  std::cout<<"-------------polymorphic.cc : logreg-------------"<<std::endl;
   SPU_TRACE_HLO(ctx, x, w, y);
   return _logreg(ctx, x, w, y).asFxp();
 }

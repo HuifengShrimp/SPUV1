@@ -49,29 +49,40 @@ spu::hal::Value train_step(spu::HalContext* ctx, const spu::hal::Value& x,
 
   auto grad = spu::hal::logreg(ctx, padded_x, w, y);
 
-  auto lr = spu::hal::constant(ctx, 0.0001F);
-  auto msize = spu::hal::constant(ctx, static_cast<float>(y.shape()[0]));
-  auto p1 = spu::hal::mul(ctx, lr, spu::hal::reciprocal(ctx, msize));
-  auto step =
-      spu::hal::mul(ctx, spu::hal::broadcast_to(ctx, p1, grad.shape()), grad);
+  auto grad1 = spu::hal::right_shift_arithmetic(ctx, grad, 36);
 
-  // auto lr = spu::hal::constant(ctx, 0.0001F);
+  // xt::xarray<float> revealed_grad = spu::hal::test::dump_public_as<float>(
+  //     ctx, spu::hal::reveal(ctx, grad1));
 
-  // auto msize = spu::hal::mul(ctx, spu::hal::constant(ctx, 4.0F), spu::hal::constant(ctx, static_cast<float>(y.shape()[0])));
+  // for(size_t i = 0; i < revealed_grad.shape(0); i++) {
+  //   for(size_t j = 0; j < revealed_grad.shape(1); j++) {
+  //     std::cout<<revealed_grad(i, j)<<std::endl;
+  //   }
+  // }
 
+  // auto lr = spu::hal::constant(ctx, 0.001F);
+  // auto msize = spu::hal::constant(ctx, static_cast<float>(y.shape()[0]));
   // auto p1 = spu::hal::mul(ctx, lr, spu::hal::reciprocal(ctx, msize));
-
   // auto step =
-  //      spu::hal::mul(ctx, spu::hal::broadcast_to(ctx, p1, grad.shape()), grad);
+  //     spu::hal::mul(ctx, spu::hal::broadcast_to(ctx, p1, grad.shape()), grad);
 
-   xt::xarray<float> revealed_step = spu::hal::test::dump_public_as<float>(
-      ctx, spu::hal::reveal(ctx, step));
+  auto lr = spu::hal::constant(ctx, 0.01F);
 
-  for(size_t i = 0; i < revealed_step.shape(0); i++) {
-    for(size_t j = 0; j < revealed_step.shape(1); j++) {
-      std::cout<<revealed_step(i, j)<<std::endl;
-    }
-  }
+  auto msize = spu::hal::mul(ctx, spu::hal::constant(ctx, 4.0F), spu::hal::constant(ctx, static_cast<float>(y.shape()[0])));
+
+  auto p1 = spu::hal::mul(ctx, lr, spu::hal::reciprocal(ctx, msize));
+
+  auto step =
+       spu::hal::mul(ctx, spu::hal::broadcast_to(ctx, p1, grad1.shape()), grad1);
+
+  // xt::xarray<float> revealed_step = spu::hal::test::dump_public_as<float>(
+  //     ctx, spu::hal::reveal(ctx, step));
+
+  // for(size_t i = 0; i < revealed_step.shape(0); i++) {
+  //   for(size_t j = 0; j < revealed_step.shape(1); j++) {
+  //     std::cout<<revealed_step(i, j)<<std::endl;
+  //   }
+  // }
 
   SPDLOG_DEBUG("[FSS-LR] W = W - Step");
   auto new_w = spu::hal::sub(ctx, w, step);
@@ -185,7 +196,7 @@ llvm::cl::opt<bool> HasLabel(
     llvm::cl::desc("if true, label is the last column of dataset"));
 llvm::cl::opt<uint32_t> BatchSize("batch_size", llvm::cl::init(31),
                                   llvm::cl::desc("size of each batch"));
-llvm::cl::opt<uint32_t> NumEpoch("num_epoch", llvm::cl::init(1),
+llvm::cl::opt<uint32_t> NumEpoch("num_epoch", llvm::cl::init(6),
                                  llvm::cl::desc("number of epoch"));
 
 std::pair<spu::hal::Value, spu::hal::Value> infeed(spu::HalContext* hctx,
