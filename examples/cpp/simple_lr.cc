@@ -14,9 +14,12 @@
 
 // clang-format off
 // To run the example, start two terminals:
-// > bazel run //examples/cpp:simple_lr -- --dataset=examples/data/perfect_logit_a.csv --has_label=true
-// > bazel run //examples/cpp:simple_lr -- --dataset=examples/data/perfect_logit_b.csv --rank=1
+// > bazel run //examples/cpp:simple_lr -- --dataset=examples/data/breast_cancer_b.csv --has_label=true
+// > bazel run //examples/cpp:simple_lr -- --dataset=examples/data/breast_cancer_a.csv --rank=1
 // clang-format on
+
+// > bazel run //examples/cpp:simple_lr -- --dataset=examples/data/heart_b.csv --has_label=true
+// > bazel run //examples/cpp:simple_lr -- --dataset=examples/data/heart_a.csv --rank=1
 
 #include <fstream>
 #include <iostream>
@@ -60,21 +63,21 @@ spu::hal::Value train_step(spu::HalContext* ctx, const spu::hal::Value& x,
   // }
 
   SPDLOG_DEBUG("[SSLR] Step = LR / B * Grad");
-  auto lr = spu::hal::constant(ctx, 0.05F);
+  auto lr = spu::hal::constant(ctx, 0.01F);
   auto msize = spu::hal::constant(ctx, static_cast<float>(y.shape()[0]));
   auto p1 = spu::hal::mul(ctx, lr, spu::hal::reciprocal(ctx, msize));
   auto step =
       spu::hal::mul(ctx, spu::hal::broadcast_to(ctx, p1, grad.shape()), grad);
 
-  // std::cout<<"----------revealed step-----------"<<std::endl;
-  // xt::xarray<float> revealed_step = spu::hal::test::dump_public_as<float>(
-  //     ctx, spu::hal::reveal(ctx, step));
+  std::cout<<"----------revealed step-----------"<<std::endl;
+  xt::xarray<float> revealed_step = spu::hal::test::dump_public_as<float>(
+      ctx, spu::hal::reveal(ctx, step));
 
-  // for(size_t i = 0; i < revealed_step.shape(0); i++) {
-  //   for(size_t j = 0; j < revealed_step.shape(1); j++) {
-  //     std::cout<<revealed_step(i, j)<<std::endl;
-  //   }
-  // }
+  for(size_t i = 0; i < revealed_step.shape(0); i++) {
+    for(size_t j = 0; j < revealed_step.shape(1); j++) {
+      std::cout<<revealed_step(i, j)<<std::endl;
+    }
+  }
 
   SPDLOG_DEBUG("[SSLR] W = W - Step");
   auto new_w = spu::hal::sub(ctx, w, step);
@@ -87,6 +90,7 @@ spu::hal::Value train_step(spu::HalContext* ctx, const spu::hal::Value& x,
 spu::hal::Value train(spu::HalContext* ctx, const spu::hal::Value& x,
                       const spu::hal::Value& y, size_t num_epoch,
                       size_t bsize) {
+
   const size_t num_iter = x.shape()[0] / bsize;
   auto w = spu::hal::constant(ctx, 0.0F, {x.shape()[1] + 1, 1});
 
@@ -112,7 +116,8 @@ spu::hal::Value train(spu::HalContext* ctx, const spu::hal::Value& x,
 
     }
   }
-
+  std::cout<<"----batchsize----"<<std::endl;
+  std::cout<<bsize<<std::endl;
   return w;
 }
 
@@ -193,7 +198,7 @@ llvm::cl::opt<bool> HasLabel(
     llvm::cl::desc("if true, label is the last column of dataset"));
 llvm::cl::opt<uint32_t> BatchSize("batch_size", llvm::cl::init(31),
                                   llvm::cl::desc("size of each batch"));
-llvm::cl::opt<uint32_t> NumEpoch("num_epoch", llvm::cl::init(300),
+llvm::cl::opt<uint32_t> NumEpoch("num_epoch", llvm::cl::init(1),
                                  llvm::cl::desc("number of epoch"));
 
 std::pair<spu::hal::Value, spu::hal::Value> infeed(spu::HalContext* hctx,

@@ -91,6 +91,8 @@ class ArrayRef {
   bool operator==(const ArrayRef& other) const;
 
   // Get data pointer
+  //1022-lj-print data every byte
+
   void* data() {
     return reinterpret_cast<void*>(buf_->data<std::byte>() + offset_);
   }

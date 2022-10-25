@@ -21,6 +21,11 @@
 // > bazel run //examples/cpp:fss_lr -- --dataset=examples/data/breast_cancer_b.csv --has_label=true
 // > bazel run //examples/cpp:fss_lr -- --dataset=examples/data/breast_cancer_a.csv --rank=1
 
+// > bazel run //examples/cpp:fss_lr -- -rank 0 -dataset examples/data/breast_cancer_b.csv -has_label=true
+// > bazel run //examples/cpp:fss_lr -- -rank 1 -dataset examples/data/breast_cancer_a.csv
+
+// > bazel test //spu/mpc/beaver:beaver_test
+
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -42,6 +47,7 @@
 
 spu::hal::Value train_step(spu::HalContext* ctx, const spu::hal::Value& x,
                            const spu::hal::Value& y, const spu::hal::Value& w) {
+
   // Padding x
   auto padding = spu::hal::constant(ctx, 1.0F, {x.shape()[0], 1});
   auto padded_x =
@@ -49,7 +55,9 @@ spu::hal::Value train_step(spu::HalContext* ctx, const spu::hal::Value& x,
 
   auto grad = spu::hal::logreg(ctx, padded_x, w, y);
 
-  auto grad1 = spu::hal::right_shift_arithmetic(ctx, grad, 36);
+  auto grad1 = spu::hal::right_shift_arithmetic(ctx, grad, 38);
+
+  // std::cout<<"--------------grad1-------------"<<std::endl;
 
   // xt::xarray<float> revealed_grad = spu::hal::test::dump_public_as<float>(
   //     ctx, spu::hal::reveal(ctx, grad1));
@@ -60,12 +68,6 @@ spu::hal::Value train_step(spu::HalContext* ctx, const spu::hal::Value& x,
   //   }
   // }
 
-  // auto lr = spu::hal::constant(ctx, 0.001F);
-  // auto msize = spu::hal::constant(ctx, static_cast<float>(y.shape()[0]));
-  // auto p1 = spu::hal::mul(ctx, lr, spu::hal::reciprocal(ctx, msize));
-  // auto step =
-  //     spu::hal::mul(ctx, spu::hal::broadcast_to(ctx, p1, grad.shape()), grad);
-
   auto lr = spu::hal::constant(ctx, 0.01F);
 
   auto msize = spu::hal::mul(ctx, spu::hal::constant(ctx, 4.0F), spu::hal::constant(ctx, static_cast<float>(y.shape()[0])));
@@ -75,14 +77,14 @@ spu::hal::Value train_step(spu::HalContext* ctx, const spu::hal::Value& x,
   auto step =
        spu::hal::mul(ctx, spu::hal::broadcast_to(ctx, p1, grad1.shape()), grad1);
 
-  // xt::xarray<float> revealed_step = spu::hal::test::dump_public_as<float>(
-  //     ctx, spu::hal::reveal(ctx, step));
+  xt::xarray<float> revealed_step = spu::hal::test::dump_public_as<float>(
+      ctx, spu::hal::reveal(ctx, step));
 
-  // for(size_t i = 0; i < revealed_step.shape(0); i++) {
-  //   for(size_t j = 0; j < revealed_step.shape(1); j++) {
-  //     std::cout<<revealed_step(i, j)<<std::endl;
-  //   }
-  // }
+  for(size_t i = 0; i < revealed_step.shape(0); i++) {
+    for(size_t j = 0; j < revealed_step.shape(1); j++) {
+      std::cout<<revealed_step(i, j)<<std::endl;
+    }
+  }
 
   SPDLOG_DEBUG("[FSS-LR] W = W - Step");
   auto new_w = spu::hal::sub(ctx, w, step);
@@ -111,21 +113,6 @@ spu::hal::Value train(spu::HalContext* ctx, const spu::hal::Value& x,
           spu::hal::slice(ctx, y, {rows_beg, 0}, {rows_end, y.shape()[1]}, {});
 
       w = train_step(ctx, x_slice, y_slice, w);
-
-      //lj
-    //   xt::xarray<float> revealed_w = spu::hal::test::dump_public_as<float>(
-    //   ctx, spu::hal::reveal(ctx, w));
-
-    //   for(size_t i = 0; i < revealed_w.shape(0); i++) {
-    //     for(size_t j = 0; j < revealed_w.shape(1); j++) {
-    //       std::cout<<revealed_w(i, j)<<std::endl;
-    //     }
-    // }
-    // std::cout<<"*******w.shape(0)*******"<<std::endl;
-    // std::cout<<revealed_w.shape(0)<<std::endl;
-    // std::cout<<"*******w.shape(1)*******"<<std::endl;
-    // std::cout<<revealed_w.shape(1)<<std::endl;
-    // std::cout<<"************************"<<std::endl;
     }
   }
 
@@ -186,6 +173,11 @@ float AUC(const xt::xarray<float>& y_true, const xt::xarray<float>& y_pred) {
 
 }
 
+//lj
+// float multi_AUC(const xt::xarray<float>& y_true, const xt::xarray<float>& y_pred) {
+  
+// }
+
 llvm::cl::opt<std::string> Dataset("dataset", llvm::cl::init("data.csv"),
                                    llvm::cl::desc("only csv is supported"));
 llvm::cl::opt<uint32_t> SkipRows(
@@ -194,9 +186,9 @@ llvm::cl::opt<uint32_t> SkipRows(
 llvm::cl::opt<bool> HasLabel(
     "has_label", llvm::cl::init(false),
     llvm::cl::desc("if true, label is the last column of dataset"));
-llvm::cl::opt<uint32_t> BatchSize("batch_size", llvm::cl::init(31),
+llvm::cl::opt<uint32_t> BatchSize("batch_size", llvm::cl::init(12),
                                   llvm::cl::desc("size of each batch"));
-llvm::cl::opt<uint32_t> NumEpoch("num_epoch", llvm::cl::init(6),
+llvm::cl::opt<uint32_t> NumEpoch("num_epoch", llvm::cl::init(5),
                                  llvm::cl::desc("number of epoch"));
 
 std::pair<spu::hal::Value, spu::hal::Value> infeed(spu::HalContext* hctx,

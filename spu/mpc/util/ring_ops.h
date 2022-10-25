@@ -31,6 +31,8 @@ ArrayRef ring_zeros(FieldType field, size_t size);
 ArrayRef ring_zeros_packed(FieldType field, size_t size);
 
 ArrayRef ring_ones(FieldType field, size_t size);
+ArrayRef ring_twos(FieldType field, size_t size);
+ArrayRef ring_four(FieldType field);
 
 ArrayRef ring_randbit(FieldType field, size_t size);
 

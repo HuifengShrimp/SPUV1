@@ -33,8 +33,8 @@ std::pair<std::vector<ArrayRef>, std::vector<ArrayRef>> reconstruct(
 
   for (size_t rank = 0; rank < seeds.size(); rank++) {
     for (size_t idx = 0; idx < descs.size(); idx++) {
-      auto t = prgReplayArray(seeds[rank], descs[idx]);
-
+      // auto t = prgReplayArray(seeds[rank], descs[idx]);
+      auto t = prgReplayArray(0, descs[idx]);
       if (rank == 0) {
         r0[idx] = t;
         rs[idx] = t.clone();
@@ -92,16 +92,33 @@ std::vector<PrgSeed> TrustedParty::getSeeds() const {
   for (size_t rank = 0; rank < seeds_.size(); rank++) {
     YASL_ENFORCE(seeds_[rank].has_value(), "seed for rank={} not set", rank);
     seeds.push_back(seeds_[rank].value());
+    // std::cout<<"-------seeds--------"<<std::endl;
+    // std::cout<<seeds_[rank].value()<<std::endl;
   }
 
   return seeds;
 }
+
+//1024-lj
+static void TransposeInplace(ArrayRef mat, size_t nrows, size_t ncols) {
+  YASL_ENFORCE_EQ((size_t)mat.numel(), nrows * ncols);
+  const auto field = mat.eltype().as<Ring2k>()->field();
+  DISPATCH_ALL_FIELDS(field, "_", [&]() {
+    auto xmat = xt_mutable_adapt<ring2k_t>(mat);
+    xmat.reshape({nrows, ncols});
+    auto xmatT = xt::eval(xt::transpose(xmat));
+    std::copy_n(xmatT.begin(), xmatT.size(), xmat.data());
+  });
+}
+
 
 ArrayRef TrustedParty::adjustMul(absl::Span<const PrgArrayDesc> descs) {
   YASL_ENFORCE_EQ(descs.size(), 3u);
   checkDescs(descs);
 
   auto [r0, rs] = reconstruct(RecOp::ADD, getSeeds(), descs);
+
+
   // r0[2] += rs[0] * rs[1] - rs[2];
   ring_add_(r0[2], ring_sub(ring_mul(rs[0], rs[1]), rs[2]));
   return r0[2];
@@ -116,14 +133,25 @@ ArrayRef TrustedParty::adjustDot(absl::Span<const PrgArrayDesc> descs, size_t M,
 
   auto [r0, rs] = reconstruct(RecOp::ADD, getSeeds(), descs);
   // r0[2] += rs[0] dot rs[1] - rs[2];
+
+  //1024-lj
+  // auto m1 = ring_ones(descs[0].field, N * N);
+  // ArrayRef m1T(makeType<RingTy>(descs[0].field), N * N);
+  // for (size_t i = 0 ; i < N * N ; i++) {
+  //   size_t index = (i % N) * N + (i / N);
+  //   m1T.at<int32_t>(index) = m1.at<int32_t>(i);
+  // }
+  // r0[2] = ring_mmul(r0[2], m1T, M, N, N);
+
   ring_add_(r0[2], ring_sub(ring_mmul(rs[0], rs[1], M, N, K), rs[2]));
   return r0[2];
 }
 
 //lj
-std::tuple<ArrayRef, ArrayRef, ArrayRef, ArrayRef, ArrayRef> TrustedParty::adjustLR(absl::Span<const PrgArrayDesc> descs, size_t M,
-                                      size_t N, size_t K) {
+std::tuple<ArrayRef, ArrayRef, ArrayRef, ArrayRef, ArrayRef> TrustedParty::adjustLR(absl::Span<const PrgArrayDesc> descs, 
+                                                                                          size_t M,size_t N, size_t K) {
   YASL_ENFORCE_EQ(descs.size(), 8u);
+
   YASL_ENFORCE(descs[0].numel == M * N);
   YASL_ENFORCE(descs[1].numel == K * N);
   YASL_ENFORCE(descs[2].numel == M * K);
@@ -133,33 +161,37 @@ std::tuple<ArrayRef, ArrayRef, ArrayRef, ArrayRef, ArrayRef> TrustedParty::adjus
   YASL_ENFORCE(descs[6].numel == K * N);
   YASL_ENFORCE(descs[7].numel == N * N);
 
-
   auto [r0, rs] = reconstruct(RecOp::ADD, getSeeds(), descs);
 
-  size_t i, j, index;
-  ArrayRef r1T(makeType<RingTy>(descs[0].field), N * M);
-  for (i = 0 ; i < M * N ; i++) {
-    index = (i % N) * M + (i / N);
-    r1T.at<int32_t>(index) = rs[0].at<int32_t>(i);
-  }
+  //1024-lj-transpose
+  auto r1T = rs[0].clone();
+  TransposeInplace(r1T, M, N);
 
+  size_t i, j;
   ring_add_(r0[3], ring_sub(ring_mmul(rs[1], r1T, K, M, N), rs[3]));
 
-  ArrayRef c2(makeType<RingTy>(descs[0].field), (M * N) * N);
+  // using U = ring2k_t;
+  SimdTrait<ArrayRef>::PackInfo pi;
+  std::vector<ArrayRef> vec_c2;
 
-  index = 0;
-  for (i = 0 ; i < M * N; i++) {
-    for (j = 0; j < N; j++) {
-      c2.at<int32_t>(index) = rs[1].at<int32_t>(j % N) * r1T.at<int32_t>(i / N);
-      index = index + 1;
+  for(i = 0; i < M * N; i++) {
+    ArrayRef c = r1T.slice(i, i+1);
+    for(j = 0; j < K * N; j++) {
+      ArrayRef d = rs[1].slice(j, j+1);
+      vec_c2.push_back(ring_mul(c, d));
     }
   }
 
+  ArrayRef c2 = SimdTrait<ArrayRef>::pack(vec_c2.begin(), vec_c2.end(), pi);
+
   ring_add_(r0[4], ring_sub(c2, rs[4]));
 
-  ring_add_(r0[5], ring_sub(ring_mmul(rs[3], rs[0], K, N, M), rs[5]));
+  ring_add_(r0[5], ring_sub(ring_mmul(ring_mmul(rs[1], r1T, K, M, N), rs[0], K, N, M), rs[5]));
 
-  ring_add_(r0[6], ring_sub(ring_mmul(rs[2], rs[0], K, N, M), rs[6]));
+  auto r3T = rs[2].clone();
+  TransposeInplace(r3T, K, M);
+
+  ring_add_(r0[6], ring_sub(ring_mmul(r3T, rs[0], K, N, M), rs[6]));
 
   ring_add_(r0[7], ring_sub(ring_mmul(r1T, rs[0], N, N, M), rs[7]));
 

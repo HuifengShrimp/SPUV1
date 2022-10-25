@@ -37,6 +37,8 @@ uint128_t GetHardwareRandom128() {
 
 BeaverTfpUnsafe::BeaverTfpUnsafe(std::shared_ptr<yasl::link::Context> lctx)
     : lctx_(lctx), seed_(GetHardwareRandom128()), counter_(0) {
+  //lj-1017
+  // seed_ = 0;
   auto buf = yasl::SerializeUint128(seed_);
   std::vector<yasl::Buffer> all_bufs =
       yasl::link::Gather(lctx_, buf, 0, "BEAVER_TFP:SYNC_SEEDS");
@@ -44,8 +46,8 @@ BeaverTfpUnsafe::BeaverTfpUnsafe(std::shared_ptr<yasl::link::Context> lctx)
   if (lctx_->Rank() == 0) {
     // Collects seeds from all parties.
     for (size_t rank = 0; rank < lctx_->WorldSize(); ++rank) {
-      PrgSeed seed = yasl::DeserializeUint128(all_bufs[rank]);
-      tp_.setSeed(rank, lctx_->WorldSize(), seed);
+      // PrgSeed seed = yasl::DeserializeUint128(all_bufs[rank]);
+      tp_.setSeed(rank, lctx_->WorldSize(), 0);
     }
   }
 }
@@ -53,6 +55,7 @@ BeaverTfpUnsafe::BeaverTfpUnsafe(std::shared_ptr<yasl::link::Context> lctx)
 Beaver::Triple BeaverTfpUnsafe::Mul(FieldType field, size_t size) {
   std::vector<PrgArrayDesc> descs(3);
 
+  seed_ = 0;
   auto a = prgCreateArray(field, size, seed_, &counter_, &descs[0]);
   auto b = prgCreateArray(field, size, seed_, &counter_, &descs[1]);
   auto c = prgCreateArray(field, size, seed_, &counter_, &descs[2]);
@@ -67,46 +70,15 @@ Beaver::Triple BeaverTfpUnsafe::Mul(FieldType field, size_t size) {
 Beaver::Triple BeaverTfpUnsafe::Dot(FieldType field, size_t M, size_t N,
                                     size_t K) {
   std::vector<PrgArrayDesc> descs(3);
-  // size_t i;
-
+  seed_ = 0;
   auto a = prgCreateArray(field, M * K, seed_, &counter_, &descs[0]);
   auto b = prgCreateArray(field, K * N, seed_, &counter_, &descs[1]);
   auto c = prgCreateArray(field, M * N, seed_, &counter_, &descs[2]);
 
-  // std::cout<<"---------"<<lctx_->Rank()<<"----------"<<std::endl;
-  // ArrayRef tmp(makeType<RingTy>(field), M * N);
-  // ArrayRef c1(makeType<RingTy>(field), M * N);
-
-  // if(lctx_->Rank() == 1) {
-  //   c1 = ring_mmul(a, b, M, N, K);
-  //   for(i = 0; i < M * N; i++) {
-  //   // std::cout<<"-------"<<i<<"--------"<<std::endl;
-  //   // std::cout<<c.at<int32_t>(i)<<std::endl;
-  //     tmp.at<int32_t>(i) = c.at<int32_t>(i);
-  //   }
-  // }
  
   if (lctx_->Rank() == 0) {
     c = tp_.adjustDot(descs, M, N, K);
-    // std::cout<<"---------Another party"<<lctx_->Rank()<<"----------"<<std::endl;
-    // // for(i = 0; i < M * N; i++) {
-    // // // std::cout<<"-------"<<i<<"--------"<<std::endl;
-    // //   std::cout<<c.at<int32_t>(i)<<std::endl;
-    // // }
-    // auto c2 = ring_add(tmp, c);
-    // auto delta = ring_sub(c1, c2);
-    // for(i = 0; i < M * N; i++){
-    //   std::cout<<delta.at<int32_t>(i)<<std::endl;
-    // }
   }
-
-  // std::cout<<"--------beaver_tfp : Dot--------"<<std::endl;
-  // for(size_t i = 0; i < M * N; i++) {
-  //   // std::cout<<"------------Dot-----------"<<std::endl;
-  //   auto c1 = ring_mmul(a, b, M, N, K);
-  //   std::cout<< ring_all_equal(c, c1) <<std::endl;
-  //   // std::cout<<"------------end-----------"<<std::endl;
-  // }
 
   return {a, b, c};
 }
@@ -127,6 +99,7 @@ Beaver::Triple BeaverTfpUnsafe::And(FieldType field, size_t size) {
 
 //lj
 Beaver::Lr_set BeaverTfpUnsafe::lr(FieldType field, size_t M, size_t N, size_t K) {
+  seed_ = 0;
   std::vector<PrgArrayDesc> descs(8);
 
   auto r1 = prgCreateArray(field, M * N, seed_, &counter_, &descs[0]);
@@ -138,8 +111,10 @@ Beaver::Lr_set BeaverTfpUnsafe::lr(FieldType field, size_t M, size_t N, size_t K
   auto c4 = prgCreateArray(field, K * N, seed_, &counter_, &descs[6]);
   auto c5 = prgCreateArray(field, N * N, seed_, &counter_, &descs[7]);
 
+
+
   if (lctx_->Rank() == 0) {
-    auto tmp = tp_.adjustLR(descs, M, N, K);
+    auto tmp = tp_.adjustLR(descs, M, N, K); 
     c1 = std::get<0>(tmp);
     c2 = std::get<1>(tmp);
     c3 = std::get<2>(tmp);
@@ -147,6 +122,22 @@ Beaver::Lr_set BeaverTfpUnsafe::lr(FieldType field, size_t M, size_t N, size_t K
     c5 = std::get<4>(tmp);
   }
 
+  // std::vector<PrgArrayDesc> descs(8);
+
+  // auto r1 = prgCreateArray(field, M * K, seed_, &counter_, &descs[0]);
+  // auto r2 = prgCreateArray(field, K * M, seed_, &counter_, &descs[1]);
+  // auto r3 = prgCreateArray(field, K * N, seed_, &counter_, &descs[2]);
+  // auto c1 = prgCreateArray(field, K * N, seed_, &counter_, &descs[2]);
+  // auto c = prgCreateArray(field, M * N, seed_, &counter_, &descs[2]);
+  // auto d = prgCreateArray(field, N * N, seed_, &counter_, &descs[4]);
+
+ 
+  // if (lctx_->Rank() == 0) {
+  //   auto = tp_.adjustLR(descs, M, N, K);
+  //   c = std::get<0>(tmp);
+  //   d = std::get<1>(tmp);
+  // }
+  
   return {r1, r2, r3, c1, c2, c3, c4, c5};
 }
 

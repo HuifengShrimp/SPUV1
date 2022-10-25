@@ -21,6 +21,11 @@
 
 #include "spu/mpc/beaver/prg_tensor.h"
 
+#include "xtensor/xvectorize.hpp"
+#include "xtensor/xview.hpp"
+
+#include "spu/core/xt_helper.h"
+
 namespace spu::mpc {
 
 class TrustedParty {

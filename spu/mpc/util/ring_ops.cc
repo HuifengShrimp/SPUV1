@@ -271,6 +271,25 @@ ArrayRef ring_ones(FieldType field, size_t size) {
   });
 }
 
+ArrayRef ring_twos(FieldType field, size_t size) {
+  return DISPATCH_ALL_FIELDS(field, kModule, [&]() {
+    ArrayRef ret(makeType<RingTy>(field), size);
+    linalg::setConstantValue(ret.numel(), &ret.at<ring2k_t>(0), ret.stride(),
+                             ring2k_t(2));
+    return ret;
+  });
+}
+
+ArrayRef ring_four(FieldType field) {
+return DISPATCH_ALL_FIELDS(field, kModule, [&]() {
+    ArrayRef ret(makeType<RingTy>(field), 1);
+    linalg::setConstantValue(ret.numel(), &ret.at<ring2k_t>(0), ret.stride(),
+                             ring2k_t(4));
+    return ret;
+  });
+}
+
+
 ArrayRef ring_randbit(FieldType field, size_t size) {
   return DISPATCH_ALL_FIELDS(field, kModule, [&]() {
     ArrayRef ret(makeType<RingTy>(field), size);

@@ -20,6 +20,9 @@ filegroup(
         "breast_cancer",
         "perfect_logit",
         "psi",
+        "digits",
+        "iris",
+        "heart",
     ],
 )
 
@@ -40,9 +43,32 @@ filegroup(
 )
 
 filegroup(
+    name = "digits",
+    srcs = [
+        "digits_a.csv", # from sklearn.dataset load_digits
+        "digits_b.csv", # frome sklearn.dataset load_digits
+    ],
+)
+filegroup(
+    name = "iris",
+    srcs = [
+        "iris_a.csv", # from sklearn.dataset load_iris
+        "iris_b.csv", # frome sklearn.dataset load_iris
+    ],
+)
+
+filegroup(
     name = "psi",
     srcs = [
         "psi_1.csv",
         "psi_2.csv",
+    ],
+)
+
+filegroup(
+    name = "heart",
+    srcs = [
+        "heart_a.csv",
+        "heart_b.csv",
     ],
 )

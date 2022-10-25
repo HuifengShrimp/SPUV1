@@ -99,6 +99,8 @@ TEST_P(BeaverTest, Mul) {
     auto _c = ArrayView<ring2k_t>(sum_c);
     for (auto idx = 0; idx < sum_a.numel(); idx++) {
       auto t = _a[idx] * _b[idx];
+      std::cout<<"--------t--------"<<std::endl;
+      std::cout<<t<<std::endl;
       auto err = t > _c[idx] ? t - _c[idx] : _c[idx] - t;
       EXPECT_LE(err, kMaxDiff);
     }
